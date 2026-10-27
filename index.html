@@ -1,0 +1,635 @@
+<title>분류 탐정</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 탐정 수첩 — 상단 코인 바 + 단계 탭, 본문은 지도(보드) | 미션 패널 2단, 좁으면 1단 */
+:root{
+  --bg:#f3f6fb; --panel:#ffffff; --panel2:#e8eef7; --line:#c9d4e4; --fg:#14213a; --muted:#4f5f7a;
+  --hi:#ffd23f; --hi-ink:#1d1600; --hi-text:#8a5a00; --hi-line:#d99800;
+  --a:#1c95d4; --b:#e2486a; --c:#7d52d9; --ok:#1d8f55; --bad:#c94a2c;
+  --display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;border-bottom:1px solid var(--line)}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px}
+h1{font-family:var(--display);font-weight:400;font-size:30px;margin:0;letter-spacing:.02em;line-height:1.1}
+h1 small{font-family:var(--body);font-size:13px;color:var(--muted);margin-left:8px;letter-spacing:0}
+.coins{margin-left:auto;display:flex;align-items:center;gap:8px}
+.coin-badge{display:flex;align-items:center;gap:8px;background:var(--hi);color:var(--hi-ink);border-radius:999px;padding:4px 14px 4px 6px;font-family:var(--mono);font-weight:600;font-size:20px}
+.coin-badge i{width:26px;height:26px;border-radius:50%;background:var(--hi-ink);color:var(--hi);display:grid;place-items:center;font-style:normal;font-size:13px;font-family:var(--body);font-weight:700}
+.coin-badge.bump{animation:bump .35s}
+@keyframes bump{50%{transform:scale(1.12)}}
+.mini{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:4px 10px;font:500 13px var(--body);cursor:pointer}
+.mini:hover{border-color:var(--muted)}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+nav button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 12px;font:500 14px var(--body);cursor:pointer}
+nav button b{font-family:var(--mono);color:var(--hi-text);margin-right:6px}
+nav button[aria-selected="true"]{background:var(--hi);color:var(--hi-ink);border-color:var(--hi-line);font-weight:700}
+nav button[aria-selected="true"] b{color:var(--hi-ink)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--hi-line);outline-offset:2px}
+section.stage{padding-top:22px}
+.stage-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:6px}
+.stage-head h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0;line-height:1.2}
+.ref{font-size:13px;color:var(--muted)}
+.lead{color:var(--muted);margin:0 0 16px;max-width:70ch}
+.grid2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px}
+.board svg{width:100%;height:auto;display:block;max-width:560px;margin:0 auto;touch-action:manipulation}
+.panel{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card h3{margin:0 0 8px;font-size:16px;color:var(--hi-text);letter-spacing:.04em}
+.card,.board{box-shadow:0 1px 2px rgba(20,33,58,.06)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 14px;font:500 15px var(--body);cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn{background:var(--panel)}
+.btn.on{background:var(--hi);color:var(--hi-ink);border-color:var(--hi-line);font-weight:700}
+.btn.primary{background:var(--hi);color:var(--hi-ink);border-color:var(--hi-line);font-weight:700}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.status{font-size:15px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.fb{border-radius:10px;padding:12px 14px;background:var(--panel2);border:1px solid var(--line);font-size:15px}
+.fb.good{border-color:var(--ok)}
+.fb.warn{border-color:var(--bad)}
+.fb b.good{color:var(--ok)} .fb b.warn{color:var(--bad)}
+.tally{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:14px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+details.gm{background:transparent;border:1px dashed var(--line);border-radius:12px;padding:10px 14px}
+details.gm summary{cursor:pointer;color:var(--muted);font-size:14px}
+details.gm ul{margin:8px 0 0;padding-left:20px;font-size:15px;color:var(--fg)}
+details.gm li{margin:4px 0}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-top:8px;justify-content:center}
+/* svg */
+.g-line{stroke:var(--line);stroke-width:1}
+.g-axis{stroke:var(--muted);stroke-width:1.2}
+.t-axis{fill:var(--muted);font:500 13px var(--mono)}
+.mA{fill:var(--a)} .mB{fill:var(--b)} .mC{fill:var(--c)}
+.mS{fill:var(--a)} .mM{fill:var(--ok)} .mL{fill:var(--b)}
+.mH{fill:var(--panel2);stroke:var(--muted);stroke-width:1.5}
+.tH{fill:var(--muted);font:600 13px var(--mono)}
+.star{fill:var(--hi);stroke:var(--hi-ink);stroke-width:1.5}
+.clickable{cursor:pointer}
+.clickable:hover .mH{stroke:var(--hi-line)}
+.ring{fill:none;stroke:var(--hi-line);stroke-width:2;stroke-dasharray:6 5;opacity:.85}
+.dlabel{fill:var(--fg);font:600 12px var(--mono)}
+.rank{fill:#fff;font:700 12px var(--mono)}
+.nline{stroke:var(--hi-line);stroke-width:2;stroke-width:1.4;stroke-dasharray:4 4}
+.ptlabel{fill:#fff;font:700 11px var(--body)}
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:center;white-space:nowrap}
+th{color:var(--muted);font-weight:500}
+td input{width:86px;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 6px;font:500 14px var(--mono);text-align:right}
+td input.ok{border-color:var(--ok)} td input.no{border-color:var(--bad)}
+tr.teacher td{color:var(--muted)}
+tr.new-row td{background:var(--panel2)}
+.lab{display:block;font-size:14px;color:var(--muted);margin:10px 0 4px}
+textarea.refl{min-height:70px}
+.mini.save{background:var(--hi);color:var(--hi-ink);border-color:var(--hi-line);font-weight:700}
+.formula{font-family:var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px;overflow-x:auto}
+.rank-list{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.rank-list div{display:flex;gap:10px;align-items:center}
+.rank-list .n{width:28px;color:var(--hi-text);font-family:var(--mono)}
+.bet{display:grid;grid-template-columns:56px minmax(0,1fr);gap:8px;align-items:center;margin:6px 0}
+.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.brief p{margin:0}
+.big{font-family:var(--display);font-size:22px;font-weight:400;margin:0 0 6px}
+.q{margin:0 0 10px}
+.q-num{font-family:var(--mono);color:var(--hi-text);margin-right:6px}
+textarea{width:100%;min-height:110px;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:10px;font:15px/1.6 var(--body)}
+input.num{width:110px;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 8px;font:500 15px var(--mono)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--hi);color:var(--hi-ink);padding:8px 16px;border-radius:999px;font-weight:700;font-size:15px;z-index:20;transition:opacity .3s;max-width:calc(100% - 32px);text-align:center}
+.toast[hidden]{display:none!important}
+.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.how-sub{font-family:var(--display);font-weight:400;font-size:22px;margin:24px 0 12px}
+ul.plain{margin:0;padding-left:18px}ul.plain li{margin:4px 0}
+ol.steps{margin:0;padding-left:20px}ol.steps li{margin:5px 0}
+.tip{margin:10px 0 0;font-size:15px;color:var(--hi-text);font-weight:500}
+table.flow td{text-align:left;white-space:normal}table.flow td:first-child{color:var(--hi-text);font-family:var(--mono);white-space:nowrap;width:1%}
+table.coin-tbl td{white-space:normal}table.coin-tbl td:first-child{white-space:nowrap;color:var(--muted)}table.coin-tbl td:nth-child(2){text-align:left}table.coin-tbl td:last-child{color:var(--hi-text);font-weight:600}table.coin-tbl td.minus{color:var(--bad)}
+@media (prefers-reduced-motion:reduce){.coin-badge.bump{animation:none}.toast{transition:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="top">
+    <h1>분류 탐정 <small>k-최근접 이웃 미션 · 수리와 인공지능</small></h1>
+    <div class="coins">
+      <div class="coin-badge" id="coinBadge" aria-live="polite"><i>코인</i><span id="coinVal">10</span></div>
+      <button class="mini" id="plus1" title="교사 보너스">+1</button>
+      <button class="mini" id="minus1" title="교사 차감">−1</button>
+      <button class="mini save" id="saveTop">결과 저장</button>
+      <button class="mini" id="resetAll">처음부터</button>
+    </div>
+  </div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="how" aria-selected="true"><b>?</b>게임 방법</button>
+    <button role="tab" data-tab="s1"><b>1</b>안개 지도</button>
+    <button role="tab" data-tab="s2"><b>2</b>함정 지도</button>
+    <button role="tab" data-tab="s3"><b>3</b>사이즈 감별사</button>
+    <button role="tab" data-tab="s4"><b>4</b>고집쟁이 봇 깨기</button>
+    <button role="tab" data-tab="s5"><b>★</b>보스 퀴즈</button>
+  </nav>
+</header>
+
+<!-- HOW TO PLAY -->
+<section class="stage" id="how">
+  <div class="stage-head"><h2>게임 방법</h2><span class="ref">시작 전 1분 안내</span></div>
+  <p class="lead">거리를 재고, 가까운 k개를 고르고, 다수결로 판정한다. 이 세 가지를 다섯 개의 단계에서 연습하는 게임이다. 코인을 아끼면서 정확하게 맞히는 것이 목표다.</p>
+
+  <div class="how-grid">
+    <div class="card"><h3>화면 구성</h3>
+      <ul class="plain">
+        <li><b>위쪽 노란 배지</b> · 지금 가진 코인. 시작은 10개.</li>
+        <li><b>단계 탭</b> · 1 → 2 → 3 → 4 → 보스 순서로 진행. 탭을 눌러 언제든 이동할 수 있다.</li>
+        <li><b>왼쪽 지도</b> · 별(★)은 분류할 새 데이터. 클릭해서 조작한다.</li>
+        <li><b>오른쪽 패널</b> · 미션 선택, 판정 버튼, 결과 피드백.</li>
+        <li><b>점선 상자</b> · 게임 마스터(선생님)용 발문. 학생은 열지 않는다.</li>
+      </ul></div>
+  </div>
+
+  <div class="card" style="margin-top:16px"><h3>코인 표</h3>
+    <div class="tbl-wrap"><table class="coin-tbl"><thead><tr><th>단계</th><th>행동</th><th>코인</th></tr></thead><tbody>
+      <tr><td>1 안개 지도</td><td>건물 주소 하나 열기</td><td class="mono minus">−1</td></tr>
+      <tr><td>1 안개 지도</td><td>내 위치를 맞힘</td><td class="mono">+5</td></tr>
+      <tr><td>1 안개 지도</td><td>동점을 알아채고 '판정 불가'를 고름</td><td class="mono">+3</td></tr>
+      <tr><td>2 함정 지도</td><td>k별 결과 예측 적중 (k마다 1회)</td><td class="mono">+2</td></tr>
+      <tr><td>3 사이즈 감별사</td><td>거리 12개 모두 정확</td><td class="mono">+3</td></tr>
+      <tr><td>3 사이즈 감별사</td><td>k 베팅 적중 (k=3, 4, 5 각각)</td><td class="mono">+3</td></tr>
+      <tr><td>3 사이즈 감별사</td><td>보너스 질문 (선생님이 인정)</td><td class="mono">+3</td></tr>
+      <tr><td>4 봇 깨기</td><td>봇과 탐정의 판정이 다른 지도 완성</td><td class="mono">+5</td></tr>
+      <tr><td>보스 퀴즈</td><td>문항당 정답</td><td class="mono">+3</td></tr>
+      <tr><td>언제든</td><td>좋은 설명·질문에 선생님 보너스 / 차감</td><td class="mono">±1</td></tr>
+    </tbody></table></div>
+    <p class="ref" style="margin:8px 0 0">코인은 성적에 들어가지 않는다. 얼마나 아끼고 얼마나 정확했는지 돌아보는 기록이다.</p></div>
+
+  <h3 class="how-sub">단계별 조작법</h3>
+  <div class="how-grid">
+    <div class="card"><h3>1 · 안개 지도</h3>
+      <ol class="steps">
+        <li>미션 버튼(1개, 3개, 5개, 함정 2개)을 고른다.</li>
+        <li>별과 가까운 물음표 건물을 미션 수만큼 클릭해 연다. 한 번에 −1.</li>
+        <li>다 열면 판정 버튼이 켜진다. A동, B동, 판정 불가 중 하나를 고른다.</li>
+        <li>'거리 측정기'를 켜면 각 건물까지의 거리가 공짜로 보인다.</li>
+      </ol>
+      <p class="tip">미션을 다시 누르면 같은 지도로 새로 시작한다.</p></div>
+    <div class="card"><h3>2 · 함정 지도</h3>
+      <ol class="steps">
+        <li>k 버튼(1, 3, 5, 9, 17)을 고른다.</li>
+        <li>결과를 보기 전에 동그라미, 세모, 네모, 동점 중 하나를 예측한다.</li>
+        <li>노란 점선 원 안의 k개가 투표한 결과와 개수가 나온다.</li>
+      </ol>
+      <p class="tip">k=1과 k=17을 꼭 해 보고, 둘 다 이상한 이유를 말해 보자.</p></div>
+    <div class="card"><h3>3 · 사이즈 감별사</h3>
+      <ol class="steps">
+        <li>학생은 1~6번의 거리를 계산해 칸에 쓴다. 거리²나 실제 거리 둘 다 된다.</li>
+        <li>선생님 몫(7~12번)은 버튼으로 채운다.</li>
+        <li>'계산 확인'을 누르면 맞은 칸은 초록, 틀린 칸은 빨강.</li>
+        <li>k=3, 4, 5의 결과를 S, M, L, 동점 중에서 베팅한다.</li>
+        <li>'베팅 공개'를 누르면 결과, 가까운 순위, 산점도 연결선이 나온다.</li>
+      </ol>
+      <p class="tip">보너스 질문과 함정 카드는 베팅 공개 뒤에 이야기한다.</p></div>
+    <div class="card"><h3>4 · 고집쟁이 봇 깨기</h3>
+      <ol class="steps">
+        <li>동그라미(A) 또는 세모(B) 도구를 고르고 지도 빈 곳을 클릭해 점을 찍는다.</li>
+        <li>점 위의 숫자는 별과 가까운 순위(1~5위)다.</li>
+        <li>봇(k=1)과 탐정(k=3)의 판정이 달라지면 성공.</li>
+        <li>지우개로 점을 하나씩 지우거나, '모두 지우기'로 처음부터.</li>
+      </ol>
+      <p class="tip">성공한 뒤에는 k=3과 k=5가 갈리는 지도에 도전한다.</p></div>
+    <div class="card"><h3>★ · 보스 퀴즈</h3>
+      <ol class="steps">
+        <li>Q1은 숫자를 쓰고 '확인', Q2와 Q3은 버튼을 고른다.</li>
+        <li>Q4는 직접 서술한다. 다 쓴 뒤 선생님이 '교사 인정'을 누른다.</li>
+        <li>마지막 상자에 학번 또는 별명과 성찰일지를 쓴다.</li>
+        <li>'결과 저장'을 누르면 모든 단계의 응답이 PDF 한 장으로 내려받아진다. 이 파일을 구글 클래스룸에 제출한다.</li>
+      </ol></div>
+    <div class="card"><h3>선생님 전용 버튼</h3>
+      <ul class="plain">
+        <li><b>+1 / −1</b> · 발문에 대한 답을 보고 코인 조정</li>
+        <li><b>정답 공개</b> · 3단계 거리 계산이 오래 걸릴 때 넘어가기</li>
+        <li><b>예시 답 보기</b> · 보너스 질문과 Q4의 예시 답안</li>
+        <li><b>결과 저장</b> · 지금까지의 응답과 성찰일지를 PDF로 저장 (위쪽 바에도 있음)</li>
+        <li><b>처음부터</b> · 두 번 눌러야 초기화(실수 방지). 저장하지 않은 응답은 사라진다.</li>
+      </ul></div>
+  </div>
+
+  <div class="card" style="margin-top:16px"><h3>온라인 수업에서 진행하는 두 가지 방법</h3>
+    <div class="how-grid" style="margin-top:4px">
+      <div><p class="big" style="font-size:18px">A. 선생님 화면 공유</p><p style="margin:0">선생님이 Meet로 화면을 공유하고, 학생은 "3번째 물음표를 열어 주세요"처럼 말로 지시한다. 클릭은 선생님이 대신한다. 학생이 왜 그 건물을 골랐는지 말하게 되어 발문하기 좋다.</p></div>
+      <div><p class="big" style="font-size:18px">B. 학생이 직접 조작</p><p style="margin:0">페이지 링크를 학생에게 공유하고 학생이 화면을 공유하며 직접 클릭한다. 코인은 학생 브라우저에만 기록되므로, 끝날 때 최종 코인을 성찰일지에 적게 한다.</p></div>
+    </div></div>
+
+  <div class="row" style="margin-top:16px"><button class="btn primary" data-goto="s1">게임 시작 → 안개 지도</button></div>
+</section>
+
+<!-- STAGE 1 -->
+<section class="stage" id="s1" hidden>
+  <div class="stage-head"><h2>1 · 안개 지도</h2><span class="ref">탐구 · 교과서 172~173쪽</span></div>
+  <p class="lead">물음표 건물을 클릭하면 주소가 드러난다(<span class="mono">−1</span> 코인). 미션의 k개만큼 열어 본 뒤 내 위치(★)가 A동인지 B동인지 판정하자.</p>
+  <div class="grid2">
+    <div class="board"><svg id="svg1" viewBox="0 0 500 500" role="img" aria-label="안개 지도"></svg>
+      <div class="legend"><span><span class="dot" style="background:var(--a)"></span> 동그라미 = A동</span><span><span class="dot" style="background:var(--b)"></span> 세모 = B동</span><span><span class="dot" style="background:var(--hi)"></span> 별 = 나</span></div></div>
+    <div class="panel">
+      <div class="card"><h3>미션 선택</h3>
+        <div class="row" id="s1missions">
+          <button class="btn" data-k="1">1개만 보기</button>
+          <button class="btn" data-k="3">3개 보기</button>
+          <button class="btn" data-k="5">5개 보기</button>
+          <button class="btn" data-k="2">함정: 2개 보기</button>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="btn" id="s1ruler">거리 측정기 켜기</button></div>
+      </div>
+      <div class="card"><h3>판정</h3>
+        <p class="status" id="s1status">미션을 먼저 고르세요.</p>
+        <div class="row" id="s1judge">
+          <button class="btn" data-ans="A" disabled>A동이다</button>
+          <button class="btn" data-ans="B" disabled>B동이다</button>
+          <button class="btn" data-ans="tie" disabled>판정 불가</button>
+        </div>
+      </div>
+      <div id="s1fb"></div>
+      <details class="gm"><summary>게임 마스터 발문</summary><ul>
+        <li>1개만 보고 틀렸을 때: "가장 가까운 건물 하나만 믿어도 될까? 무엇을 더 확인하고 싶어?"</li>
+        <li>3개, 5개로 성공했을 때: "코인을 더 썼는데 왜 더 확신할 수 있었지?"</li>
+        <li>2개 함정: "1 대 1이 나오면 어떻게 하지? 두 유형을 나눌 때 k를 어떤 수로 정하면 이런 일이 없을까?" → 홀수</li>
+        <li>거리 측정기: "어떤 건물이 '가까운' 건물인지 눈대중 말고 수로 정하려면?" → 두 점 사이 거리 공식(175쪽)</li>
+      </ul></details>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 2 -->
+<section class="stage" id="s2" hidden>
+  <div class="stage-head"><h2>2 · 함정 지도</h2><span class="ref">탐구 · 교과서 174쪽</span></div>
+  <p class="lead">이번엔 지도가 다 보인다. 대신 k를 고르고 결과를 <b>먼저 예측</b>해야 한다. 예측이 맞으면 <span class="mono">+2</span> 코인.</p>
+  <div class="grid2">
+    <div class="board"><svg id="svg2" viewBox="0 0 500 500" role="img" aria-label="함정 지도"></svg>
+      <div class="legend"><span><span class="dot" style="background:var(--a)"></span> 동그라미 5</span><span><span class="dot" style="background:var(--b)"></span> 세모 5</span><span><span class="dot" style="background:var(--c)"></span> 네모 7</span><span><span class="dot" style="background:var(--hi)"></span> 새 데이터</span></div></div>
+    <div class="panel">
+      <div class="card"><h3>① k 고르기</h3>
+        <div class="row" id="s2k"><button class="btn" data-k="1">k=1</button><button class="btn" data-k="3">k=3</button><button class="btn" data-k="5">k=5</button><button class="btn" data-k="9">k=9</button><button class="btn" data-k="17">k=17</button></div></div>
+      <div class="card"><h3>② 예측하기</h3>
+        <div class="row" id="s2pred"><button class="btn" data-p="A" disabled>동그라미</button><button class="btn" data-p="B" disabled>세모</button><button class="btn" data-p="C" disabled>네모</button><button class="btn" data-p="tie" disabled>동점</button></div></div>
+      <div id="s2fb"><div class="fb">k를 고르면 예측 버튼이 열립니다.</div></div>
+      <details class="gm"><summary>게임 마스터 발문</summary><ul>
+        <li>k=1: "눈으로 보면 동그라미 무리 안에 있는데 왜 세모가 됐을까?" → 바로 옆 세모 하나가 이상치</li>
+        <li>k=17: "전체 17개를 다 보면 가장 멀리 있는 네모가 이긴다. 무엇이 문제일까?"</li>
+        <li>정리: k가 너무 작으면 학습 데이터에 지나치게 의존(과대 적합), 너무 크면 변별력이 사라짐(과소 적합)</li>
+        <li>"그럼 적절한 k는 누가, 어떻게 정할까?" → 검증 데이터로 여러 k를 시험해 정확도가 높은 k를 고름</li>
+      </ul></details>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 3 -->
+<section class="stage" id="s3" hidden>
+  <div class="stage-head"><h2>3 · 사이즈 감별사</h2><span class="ref">실행 · 교과서 176~177쪽</span></div>
+  <p class="lead">키 169cm, 몸무게 72kg인 친구의 상의 사이즈는? 1~6번은 학생, 7~12번은 선생님이 계산하고 서로 검산한다. 거리의 제곱(√ 안의 값)이나 실제 거리 중 무엇을 써도 된다.</p>
+  <div class="grid2">
+    <div class="panel">
+      <div class="formula">거리 = √{(169 − 키)² + (72 − 몸무게)²}  ·  예) 1번: (169−162)² + (72−54)² = 49 + 324 = 373</div>
+      <div class="card tbl-wrap"><table id="s3tbl"><thead><tr><th>번호</th><th>키</th><th>몸무게</th><th>사이즈</th><th>거리² 또는 거리</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="row"><button class="btn" id="s3teacher">선생님 몫(7~12번) 채우기</button><button class="btn primary" id="s3check">계산 확인</button><button class="btn" id="s3reveal">정답 공개</button></div>
+      <div id="s3checkfb"></div>
+    </div>
+    <div class="panel">
+      <div class="card"><h3>k 베팅 · 결과 보기 전에 예측</h3>
+        <div id="s3bets"></div>
+        <div class="row" style="margin-top:8px"><button class="btn primary" id="s3open" disabled>베팅 공개</button></div>
+        <div id="s3betfb" style="margin-top:10px"></div></div>
+      <div class="board"><svg id="svg3" viewBox="0 0 470 420" role="img" aria-label="키와 몸무게 산점도"></svg>
+        <div class="row" id="s3kview" style="justify-content:center;margin-top:6px"></div></div>
+      <div class="card" id="s3rankcard" hidden><h3>가까운 순서</h3><div class="rank-list" id="s3rank"></div></div>
+      <div class="card"><h3>보너스 질문 · +3</h3>
+        <p style="margin:0 0 8px">교과서 177쪽 표는 루트를 씌우지 않은 값(거리²)으로 순서를 정했다. 루트를 씌우면 순서가 바뀔까?</p>
+        <div class="row"><button class="btn" id="s3bonusAns">예시 답 보기</button><button class="btn" id="s3bonusOk">정답 인정 +3</button></div>
+        <p id="s3bonusTxt" class="ref" hidden style="margin-top:8px">바뀌지 않는다. 0 이상인 수에서는 큰 수일수록 제곱근도 크기 때문에(√는 증가함수) 대소 관계가 그대로 유지된다. 그래서 순위만 필요할 때는 계산이 간단한 거리²를 써도 된다.</p></div>
+      <div class="card"><h3>함정 카드 · 단위가 바뀌면?</h3>
+        <p style="margin:0 0 8px">몸무게를 kg 대신 g으로 기록하면 가까운 순서는 어떻게 될까? 먼저 예측한 뒤 뒤집어 보자.</p>
+        <button class="btn" id="s3trap">카드 뒤집기</button>
+        <div id="s3trapOut" hidden style="margin-top:10px"></div></div>
+      <details class="gm"><summary>게임 마스터 발문</summary><ul>
+        <li>k=4에서 L 2, M 2 동점이 나온다. "안개 지도의 함정과 같은 일이 실제 데이터에서도 생겼네?"</li>
+        <li>"키 1cm 차이와 몸무게 1kg 차이를 같은 무게로 봐도 될까?" → 184쪽 스케일링으로 연결</li>
+        <li>코드 구현(178~183쪽)은 다음 차시 Colab에서: "오늘 손으로 한 3단계를 컴퓨터는 어떻게 할까?"</li>
+      </ul></details>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 4 -->
+<section class="stage" id="s4" hidden>
+  <div class="stage-head"><h2>4 · 고집쟁이 봇 깨기</h2><span class="ref">실행 · 반례 설계</span></div>
+  <p class="lead">선생님 봇은 가장 가까운 점 <b>1개</b>만 보고 판정한다. 지도에 점을 찍어서 <b>봇(k=1)과 탐정(k=3)의 판정이 달라지는 지도</b>를 만들면 성공(<span class="mono">+5</span>).</p>
+  <div class="grid2">
+    <div class="board"><svg id="svg4" viewBox="0 0 500 500" role="img" aria-label="점을 찍는 지도"></svg>
+      <div class="legend"><span>빈 곳을 클릭하면 점이 찍힘 · 점 위 숫자는 별과 가까운 순위</span></div></div>
+    <div class="panel">
+      <div class="card"><h3>도구</h3>
+        <div class="row" id="s4mode"><button class="btn on" data-m="A">동그라미(A) 찍기</button><button class="btn" data-m="B">세모(B) 찍기</button><button class="btn" data-m="del">지우개</button><button class="btn" id="s4clear">모두 지우기</button></div></div>
+      <div class="card"><h3>판정 비교</h3><div id="s4verdict"></div></div>
+      <div id="s4fb"></div>
+      <div class="card"><h3>추가 도전</h3><p style="margin:0">k=3과 k=5의 판정이 달라지는 지도도 만들 수 있을까? 몇 개의 점이 필요할까?</p></div>
+      <details class="gm"><summary>게임 마스터 발문</summary><ul>
+        <li>"점을 어디에 찍어야 봇이 틀릴까? 왜 그 자리여야 하지?" → 별 바로 옆에 다른 유형의 점 하나(이상치)</li>
+        <li>"현실 데이터에서 이런 점은 어떤 경우에 생길까?" → 측정 오류, 레이블 실수, 드문 사례</li>
+        <li>설계 과정에서 보인 태도는 정의적 능력 '수학적 문제 해결 태도' 관찰 기록에 활용 가능</li>
+      </ul></details>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 5 BOSS -->
+<section class="stage" id="s5" hidden>
+  <div class="stage-head"><h2>보스 퀴즈</h2><span class="ref">성찰 · 형성평가 (수행평가 ② 논술형 대비)</span></div>
+  <p class="lead">하루 공부 시간과 과제 점수로 시험 합격 여부를 예측하는 kNN 모델이다. 새로 온 학생 <b class="mono">N</b>은 공부 시간 <b class="mono">5시간</b>, 과제 점수 <b class="mono">5점</b>이다. 문항마다 정답 <span class="mono">+3</span>.</p>
+  <div class="grid2">
+    <div class="panel">
+      <div class="card tbl-wrap"><h3>기존 데이터</h3>
+        <table id="bossTbl"><thead><tr><th>학생</th><th>공부 시간<br>(시간)</th><th>과제 점수<br>(10점 만점)</th><th>결과</th><th>N과의 거리² 또는 거리</th><th>순위</th></tr></thead><tbody>
+          <tr class="new-row"><td><b>N (새 데이터)</b></td><td class="mono">5</td><td class="mono">5</td><td>?</td><td class="ref">기준</td><td></td></tr>
+        </tbody></table></div>
+      <div class="card"><p class="q"><span class="q-num">Q1</span>새 데이터 N과 기존 데이터 가~마 사이의 거리를 각각 구해 표에 쓰시오.</p>
+        <div class="formula" style="margin-bottom:10px">거리 = √{(5 − 공부 시간)² + (5 − 과제 점수)²}</div>
+        <div class="row"><button class="btn primary" id="q1check">계산 확인</button><span id="q1fb"></span></div></div>
+      <div class="card"><p class="q"><span class="q-num">Q2</span>k=3일 때 N의 예측 결과는?</p>
+        <div class="row"><button class="btn" data-q2="합격">합격</button><button class="btn" data-q2="불합격">불합격</button><span id="q2fb"></span></div></div>
+      <div class="card"><p class="q"><span class="q-num">Q3</span>k=5로 바꾸면 예측 결과는?</p>
+        <div class="row"><button class="btn" data-q3="합격">합격</button><button class="btn" data-q3="불합격">불합격</button><span id="q3fb"></span></div></div>
+    </div>
+    <div class="panel">
+      <div class="card"><p class="q"><span class="q-num">Q4</span>"과제 점수 7점 이상이면 합격"처럼 기준선 하나로 정하는 규칙(임계값 규칙)과 kNN은 판단 방식이 어떻게 다른가? kNN이 더 쓸모 있는 경우를 함께 서술하시오.</p>
+        <textarea id="q4" aria-label="Q4 서술 답안" placeholder="여기에 직접 써 보세요."></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn" id="q4ans">예시 답안 보기</button><button class="btn" id="q4ok">교사 인정 +3</button></div>
+        <p id="q4txt" class="ref" hidden style="margin-top:8px">임계값 규칙은 사람이 정한 기준선 하나로 판단하므로 한 가지 속성만 반영하고, 데이터가 늘어나도 규칙이 저절로 바뀌지 않는다. kNN은 새 데이터와 기존 데이터 사이의 거리를 계산해 가장 가까운 k개의 결과를 다수결로 따르므로 여러 속성(공부 시간과 과제 점수)을 함께 반영하고, 쌓인 데이터에 따라 판단이 달라진다. 기준선을 정하기 어렵거나 속성이 여러 개일 때 kNN이 더 유용하다. 단, k값과 이상치에 따라 결과가 달라질 수 있다.</p></div>
+      <div class="card"><h3>미션 종료 · 성찰일지</h3>
+        <p style="margin:0 0 10px">최종 코인 <b class="mono" id="finalCoins">10</b>개</p>
+        <label class="lab" for="stuName">학번 또는 별명</label>
+        <input id="stuName" class="num" style="width:100%;max-width:260px" placeholder="예: 2학년 탐정K">
+        <label class="lab" for="r1">수업을 통해 알게 된 내용</label><textarea id="r1" class="refl"></textarea>
+        <label class="lab" for="r2">잘 몰라서 더 알아봐야 할 내용</label><textarea id="r2" class="refl"></textarea>
+        <label class="lab" for="r3">호기심이 생긴 내용</label><textarea id="r3" class="refl"></textarea>
+        <label class="lab" for="r4">게임 질문: 내가 코인을 가장 아깝게 쓴 순간은? 그때 무엇을 놓쳤나?</label><textarea id="r4" class="refl"></textarea>
+        <div class="row" style="margin-top:12px"><button class="btn primary" id="saveBtn">결과 저장 (PDF)</button><span id="saveMsg" class="ref"></span></div>
+      </div>
+      <details class="gm"><summary>게임 마스터 메모 · 정답</summary><ul>
+        <li>Q1: 거리² 가 1, 나 4, 다 5, 라 25, 마 9 → 거리 가 1, 나 2, 다 √5≈2.24, 라 5, 마 3</li>
+        <li>Q2: 가까운 순서 가 → 나 → 다 → 마 → 라. 가까운 3개 합격 2, 불합격 1 → 합격</li>
+        <li>Q3: 5개 모두 → 합격 2, 불합격 3 → 불합격 (k에 따라 결과가 뒤집힘)</li>
+        <li>Q4는 수행평가 ② '분류 모델의 수학적 원리 분석하기' 서술 요소와 같은 방향</li>
+      </ul></details>
+    </div>
+  </div>
+</section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+const LOG={s1:[],s2:[],q2:null,q3:null};
+const NS='http://www.w3.org/2000/svg';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+const px=x=>30+x*44, py=y=>470-y*44;
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+
+/* ---------- coins ---------- */
+let coins=10, toastT;
+function award(n,msg){coins+=n;$('#coinVal').textContent=coins;$('#finalCoins').textContent=coins;
+  const b=$('#coinBadge');b.classList.remove('bump');void b.offsetWidth;b.classList.add('bump');
+  if(msg){const t=$('#toast');t.textContent=(n>0?'+':'')+n+' 코인 · '+msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,1800)}}
+$('#plus1').onclick=()=>award(1,'교사 보너스');
+$('#minus1').onclick=()=>award(-1,'교사 차감');
+let resetArm=false;
+$('#resetAll').onclick=e=>{if(!resetArm){resetArm=true;e.target.textContent='한 번 더 누르면 초기화';setTimeout(()=>{resetArm=false;e.target.textContent='처음부터'},2500);return}location.reload()};
+
+/* ---------- tabs ---------- */
+function go(id){$$('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===id));$$('section.stage').forEach(s=>s.hidden=s.id!==id);window.scrollTo({top:0})}
+$$('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+$$('[data-goto]').forEach(b=>b.onclick=()=>go(b.dataset.goto));
+
+/* ---------- drawing ---------- */
+function grid(svg){for(let i=0;i<=10;i++){el('line',{x1:px(i),y1:py(0),x2:px(i),y2:py(10),class:'g-line'},svg);el('line',{x1:px(0),y1:py(i),x2:px(10),y2:py(i),class:'g-line'},svg)}}
+function starPts(cx,cy,R,r){let p=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r:R;p.push((cx+rr*Math.cos(a)).toFixed(1)+','+(cy+rr*Math.sin(a)).toFixed(1))}return p.join(' ')}
+function shape(parent,type,cx,cy,s=11,cls){
+  const g=el('g',{},parent);const c=cls||('m'+type);
+  if(type==='A'||type==='S'||type==='M'||type==='L')el('circle',{cx,cy,r:s,class:c},g);
+  else if(type==='B')el('polygon',{points:`${cx},${cy-s-2} ${cx+s+1},${cy+s-1} ${cx-s-1},${cy+s-1}`,class:c},g);
+  else if(type==='C')el('rect',{x:cx-s+1,y:cy-s+1,width:2*s-2,height:2*s-2,class:c},g);
+  else if(type==='H'){el('rect',{x:cx-s-1,y:cy-s-1,width:2*s+2,height:2*s+2,rx:5,class:'mH'},g);const t=el('text',{x:cx,y:cy+4.5,'text-anchor':'middle',class:'tH'},g);t.textContent='?'}
+  else if(type==='star')el('polygon',{points:starPts(cx,cy,s+5,(s+5)*.45),class:'star'},g);
+  return g}
+const NAME={A:'A동',B:'B동',tie:'판정 불가'};
+
+/* ---------- STAGE 1 ---------- */
+const S1={star:[5,5],truth:'B',pts:[
+ {x:4.6,y:5.5,c:'A'},{x:5.9,y:4.6,c:'B'},{x:5.2,y:6.2,c:'B'},{x:3.6,y:4.4,c:'A'},{x:6.6,y:5.3,c:'B'},{x:4.4,y:3.2,c:'B'},
+ {x:2.2,y:7.5,c:'A'},{x:1.5,y:2.5,c:'A'},{x:8.2,y:7,c:'B'},{x:7.5,y:2,c:'B'},{x:2.5,y:5.5,c:'A'},{x:8.5,y:4.5,c:'B'},
+ {x:1.2,y:8.6,c:'A'},{x:8.8,y:9,c:'B'}]};
+S1.pts.forEach(p=>p.d=dist([p.x,p.y],S1.star));
+const s1order=S1.pts.map((p,i)=>i).sort((a,b)=>S1.pts[a].d-S1.pts[b].d);
+const s1={k:0,rev:new Set(),done:false,ruler:false};
+function renderS1(){const svg=$('#svg1');svg.innerHTML='';grid(svg);
+  if(s1.ruler&&s1.rev.size){const r=Math.max(...[...s1.rev].map(i=>S1.pts[i].d));el('circle',{cx:px(5),cy:py(5),r:r*44+14,class:'ring'},svg)}
+  S1.pts.forEach((p,i)=>{const shown=s1.done||s1.rev.has(i);const g=shape(svg,shown?p.c:'H',px(p.x),py(p.y));
+    if(!shown){g.classList.add('clickable');g.setAttribute('tabindex','0');g.setAttribute('role','button');g.setAttribute('aria-label','건물 주소 열기');g.onclick=()=>revealS1(i);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();revealS1(i)}}}
+    if(s1.ruler){const t=el('text',{x:px(p.x),y:py(p.y)-17,'text-anchor':'middle',class:'dlabel'},svg);t.textContent=p.d.toFixed(2)}});
+  shape(svg,'star',px(5),py(5),11);
+  const st=$('#s1status');
+  if(!s1.k)st.textContent='미션을 먼저 고르세요.';
+  else if(s1.done)st.textContent='판정 완료. 다른 미션을 골라 다시 도전하세요.';
+  else st.innerHTML=`건물 <b class="mono">${s1.rev.size} / ${s1.k}</b>개 확인`+(s1.rev.size===s1.k?' · 이제 판정하세요.':'');
+  $$('#s1judge button').forEach(b=>b.disabled=!(s1.k&&s1.rev.size===s1.k&&!s1.done))}
+function revealS1(i){if(!s1.k){toast1('미션을 먼저 고르세요');return}if(s1.done||s1.rev.size>=s1.k)return;s1.rev.add(i);award(-1,'주소 확인');renderS1()}
+function toast1(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,1600)}
+$$('#s1missions button').forEach(b=>b.onclick=()=>{s1.k=+b.dataset.k;s1.rev=new Set();s1.done=false;$$('#s1missions button').forEach(x=>x.classList.toggle('on',x===b));$('#s1fb').innerHTML='';renderS1()});
+$('#s1ruler').onclick=e=>{s1.ruler=!s1.ruler;e.target.textContent=s1.ruler?'거리 측정기 끄기':'거리 측정기 켜기';e.target.classList.toggle('on',s1.ruler);renderS1()};
+function tallyHTML(cnt,map){return '<div class="tally">'+Object.keys(map).map(k=>`<span class="chip"><span class="dot" style="background:${map[k][1]}"></span>${map[k][0]} <b class="mono">${cnt[k]||0}</b></span>`).join('')+'</div>'}
+function majority(cnt){const e=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);if(!e.length)return null;if(e.length>1&&e[0][1]===e[1][1])return 'tie';return e[0][0]}
+$$('#s1judge button').forEach(b=>b.onclick=()=>{
+  const ans=b.dataset.ans,cnt={};[...s1.rev].forEach(i=>cnt[S1.pts[i].c]=(cnt[S1.pts[i].c]||0)+1);
+  const maj=majority(cnt);const nearest=new Set(s1order.slice(0,s1.k));const ok=[...s1.rev].every(i=>nearest.has(i));
+  LOG.s1.push({k:s1.k,ans:NAME[ans],maj:NAME[maj],cnt:{...cnt},ok:ans===S1.truth||(ans==='tie'&&maj==='tie'),near:ok});
+  s1.done=true;let cls='warn',msg='';
+  if(ans===S1.truth){award(5,'위치 판정 성공');cls='good';msg=`<b class="good">성공! 나는 B동에 있다.</b>`}
+  else if(ans==='tie'&&maj==='tie'){award(3,'동점 발견');cls='good';msg=`<b class="good">동점을 발견했다!</b> 1 대 1이면 다수결이 불가능하다.`}
+  else msg=`<b class="warn">실패.</b> 실제 위치는 <b>B동</b>이었다.`;
+  let extra='';
+  if(!ok)extra+=`<p style="margin:8px 0 0">열어 본 건물 중 별과 <b>가장 가까운 ${s1.k}개</b>가 아닌 것이 있다. 거리 측정기로 확인해 보자.</p>`;
+  if(s1.k===1)extra+=`<p style="margin:8px 0 0">가장 가까운 건물 하나는 A동이었다. 하나만 보고 판단하면 위험하다.</p>`;
+  if(s1.k===2&&maj==='tie'&&ans!=='tie')extra+=`<p style="margin:8px 0 0">열어 본 2개가 1 대 1이었다. 다수결로 정할 수 있었을까?</p>`;
+  $('#s1fb').innerHTML=`<div class="fb ${cls}">${msg}${tallyHTML(cnt,{A:['A동',getComputedStyle(document.documentElement).getPropertyValue('--a')],B:['B동',getComputedStyle(document.documentElement).getPropertyValue('--b')]})}다수결 결과: <b>${NAME[maj]}</b> · 내 판정: <b>${NAME[ans]}</b>${extra}</div>`;
+  renderS1()});
+renderS1();
+
+/* ---------- STAGE 2 ---------- */
+const S2={nw:[3,5],pts:[
+ {x:3.3,y:5.3,c:'B'},{x:2.4,y:5.6,c:'A'},{x:3.6,y:4.0,c:'A'},{x:2.2,y:4.3,c:'A'},{x:3.9,y:5.9,c:'A'},{x:2.0,y:6.4,c:'A'},
+ {x:6.5,y:8.2,c:'B'},{x:7.3,y:8.8,c:'B'},{x:5.8,y:9.0,c:'B'},{x:7.9,y:7.6,c:'B'},
+ {x:7.5,y:2.5,c:'C'},{x:8.3,y:1.8,c:'C'},{x:8.8,y:3.0,c:'C'},{x:7.8,y:3.6,c:'C'},{x:9.0,y:1.2,c:'C'},{x:8.5,y:4.2,c:'C'},{x:9.3,y:2.4,c:'C'}]};
+S2.pts.forEach(p=>p.d=dist([p.x,p.y],S2.nw));
+const s2order=S2.pts.map((p,i)=>i).sort((a,b)=>S2.pts[a].d-S2.pts[b].d);
+const s2={k:0,shown:false,done:new Set()};
+const N2={A:'동그라미',B:'세모',C:'네모',tie:'동점'};
+function renderS2(){const svg=$('#svg2');svg.innerHTML='';grid(svg);
+  const top=s2.shown?new Set(s2order.slice(0,s2.k)):new Set();
+  if(s2.shown){const r=S2.pts[s2order[s2.k-1]].d;el('circle',{cx:px(3),cy:py(5),r:r*44+13,class:'ring'},svg)}
+  S2.pts.forEach((p,i)=>{const g=shape(svg,p.c,px(p.x),py(p.y),10);if(s2.shown&&!top.has(i))g.setAttribute('opacity','.3')});
+  shape(svg,'star',px(3),py(5),10)}
+$$('#s2k button').forEach(b=>b.onclick=()=>{s2.k=+b.dataset.k;s2.shown=false;$$('#s2k button').forEach(x=>x.classList.toggle('on',x===b));$$('#s2pred button').forEach(x=>x.disabled=false);$('#s2fb').innerHTML=`<div class="fb">k=${s2.k}일 때 새 데이터는 무엇으로 분류될까? 예측을 고르세요.</div>`;renderS2()});
+$$('#s2pred button').forEach(b=>b.onclick=()=>{
+  const cnt={};s2order.slice(0,s2.k).forEach(i=>cnt[S2.pts[i].c]=(cnt[S2.pts[i].c]||0)+1);const maj=majority(cnt);
+  s2.shown=true;$$('#s2pred button').forEach(x=>x.disabled=true);
+  const right=b.dataset.p===maj;let note='';LOG.s2.push({k:s2.k,pred:N2[b.dataset.p],res:N2[maj],right});
+  if(right&&!s2.done.has(s2.k)){award(2,'예측 성공');s2.done.add(s2.k)}
+  if(s2.k===1)note='바로 옆의 세모 하나(이상치)에 끌려갔다. k가 너무 작으면 과대 적합.';
+  if(s2.k===17)note='데이터 전체가 투표했다. 가장 먼 네모가 개수로 이겼다. k가 너무 크면 과소 적합.';
+  if(s2.k===3||s2.k===5)note='이상치 하나를 다른 이웃들이 눌러 주었다.';
+  if(s2.k===9)note='아직은 동그라미가 이기지만, k를 더 키우면 먼 데이터의 표가 늘어난다.';
+  const css=getComputedStyle(document.documentElement);
+  $('#s2fb').innerHTML=`<div class="fb ${right?'good':'warn'}"><b class="${right?'good':'warn'}">${right?'예측 성공!':'예측 실패.'}</b> k=${s2.k}의 결과는 <b>${N2[maj]}</b>.${tallyHTML(cnt,{A:['동그라미',css.getPropertyValue('--a')],B:['세모',css.getPropertyValue('--b')],C:['네모',css.getPropertyValue('--c')]})}${note}</div>`;
+  renderS2()});
+renderS2();
+
+/* ---------- STAGE 3 ---------- */
+const D3=[[162,54,'S'],[182,75,'L'],[156,52,'S'],[168,56,'M'],[160,48,'S'],[173,67,'M'],[176,60,'M'],[178,70,'L'],[171,75,'L'],[165,50,'S'],[184,69,'L'],[164,62,'M']].map((r,i)=>({n:i+1,h:r[0],w:r[1],s:r[2],d2:(169-r[0])**2+(72-r[1])**2}));
+const s3order=D3.map((r,i)=>i).sort((a,b)=>D3[a].d2-D3[b].d2);
+const s3={unlocked:false,bets:{},opened:false,viewK:3};
+const tb=$('#s3tbl tbody');
+D3.forEach((r,i)=>{const tr=document.createElement('tr');if(i>=6)tr.className='teacher';
+  tr.innerHTML=`<td class="mono">${r.n}</td><td class="mono">${r.h}</td><td class="mono">${r.w}</td><td>${r.s}</td><td><input id="d3_${i}" inputmode="decimal" aria-label="${r.n}번 거리"></td><td id="m3_${i}"></td>`;tb.appendChild(tr)});
+function okVal(v,r){if(v===''||isNaN(v))return false;v=+v;return Math.abs(v-r.d2)<0.5||Math.abs(v-Math.sqrt(r.d2))<0.06}
+$('#s3teacher').onclick=()=>{for(let i=6;i<12;i++)$('#d3_'+i).value=D3[i].d2};
+$('#s3check').onclick=()=>{let good=0;D3.forEach((r,i)=>{const inp=$('#d3_'+i),v=inp.value.trim(),ok=okVal(v,r);inp.classList.toggle('ok',ok);inp.classList.toggle('no',v!==''&&!ok);$('#m3_'+i).textContent=ok?'✓':(v?'✗':'');if(ok)good++});
+  $('#s3checkfb').innerHTML=`<div class="fb ${good===12?'good':''}">${good===12?'<b class="good">12개 모두 정확!</b> 이제 베팅하고 공개하세요.':`정확한 값 <b class="mono">${good} / 12</b>. 틀린 칸은 서로 검산해 보세요.`}</div>`;
+  if(good===12){if(!s3.unlocked)award(3,'거리 계산 완료');unlock3()}};
+$('#s3reveal').onclick=()=>{D3.forEach((r,i)=>{$('#d3_'+i).value=r.d2;$('#d3_'+i).classList.add('ok');$('#m3_'+i).textContent='✓'});unlock3()};
+function unlock3(){s3.unlocked=true;$('#s3open').disabled=Object.keys(s3.bets).length<3||s3.opened;renderRank()}
+const betBox=$('#s3bets');
+[3,4,5].forEach(k=>{const d=document.createElement('div');d.className='bet';d.innerHTML=`<span class="mono">k=${k}</span><div class="row">${['S','M','L','동점'].map(o=>`<button class="btn" data-bk="${k}" data-bo="${o}">${o}</button>`).join('')}</div>`;betBox.appendChild(d)});
+$$('[data-bk]').forEach(b=>b.onclick=()=>{if(s3.opened)return;const k=b.dataset.bk;s3.bets[k]=b.dataset.bo;$$(`[data-bk="${k}"]`).forEach(x=>x.classList.toggle('on',x===b));$('#s3open').disabled=!(s3.unlocked&&Object.keys(s3.bets).length===3)});
+function verdict3(k){const cnt={};s3order.slice(0,k).forEach(i=>cnt[D3[i].s]=(cnt[D3[i].s]||0)+1);const m=majority(cnt);return{cnt,m:m==='tie'?'동점':m}}
+$('#s3open').onclick=()=>{s3.opened=true;$('#s3open').disabled=true;let html='';
+  [3,4,5].forEach(k=>{const v=verdict3(k),ok=s3.bets[k]===v.m;if(ok)award(3,`k=${k} 베팅 적중`);
+    html+=`<div style="margin:4px 0"><span class="mono">k=${k}</span> · S ${v.cnt.S||0}, M ${v.cnt.M||0}, L ${v.cnt.L||0} → <b>${v.m}</b> <b class="${ok?'good':'warn'}">${ok?'적중':'빗나감'}</b></div>`});
+  $('#s3betfb').innerHTML=`<div class="fb">${html}<p style="margin:8px 0 0">k=4에서 동점이 나온다. 그래서 두 유형 이상을 나눌 때는 동점이 나지 않도록 k를 정해야 한다.</p></div>`;renderRank()};
+function renderPlot(){const svg=$('#svg3');svg.innerHTML='';const X=h=>50+(h-150)*10,Y=w=>380-(w-45)*10;
+  for(let h=150;h<=190;h+=10){el('line',{x1:X(h),y1:Y(45),x2:X(h),y2:Y(80),class:'g-line'},svg);const t=el('text',{x:X(h),y:Y(45)+18,'text-anchor':'middle',class:'t-axis'},svg);t.textContent=h}
+  for(let w=45;w<=80;w+=5){el('line',{x1:X(150),y1:Y(w),x2:X(190),y2:Y(w),class:'g-line'},svg);const t=el('text',{x:X(150)-8,y:Y(w)+4,'text-anchor':'end',class:'t-axis'},svg);t.textContent=w}
+  const tx=el('text',{x:X(190),y:Y(45)+34,'text-anchor':'end',class:'t-axis'},svg);tx.textContent='키(cm)';
+  const ty=el('text',{x:X(150),y:Y(80)-10,'text-anchor':'start',class:'t-axis'},svg);ty.textContent='몸무게(kg)';
+  if(s3.opened)s3order.slice(0,s3.viewK).forEach(i=>el('line',{x1:X(169),y1:Y(72),x2:X(D3[i].h),y2:Y(D3[i].w),class:'nline'},svg));
+  D3.forEach(r=>{shape(svg,r.s,X(r.h),Y(r.w),9);const t=el('text',{x:X(r.h),y:Y(r.w)+4,'text-anchor':'middle',class:'ptlabel'},svg);t.textContent=r.s});
+  shape(svg,'star',X(169),Y(72),9)}
+function renderRank(){renderPlot();const kv=$('#s3kview');kv.innerHTML='';
+  if(!s3.opened){kv.innerHTML='<span class="ref">베팅 공개 후 이웃 연결선을 볼 수 있어요</span>'}
+  else [1,3,4,5,7].forEach(k=>{const b=document.createElement('button');b.className='btn'+(k===s3.viewK?' on':'');b.textContent='k='+k;b.onclick=()=>{s3.viewK=k;renderRank()};kv.appendChild(b)});
+  if(!s3.unlocked||!s3.opened){$('#s3rankcard').hidden=true;return}
+  $('#s3rankcard').hidden=false;
+  $('#s3rank').innerHTML=s3order.map((i,j)=>`<div><span class="n">${j+1}위</span><span class="mono">${D3[i].n}번</span><span class="mono">거리² ${D3[i].d2}</span><span>${D3[i].s}</span></div>`).join('')}
+$('#s3bonusAns').onclick=()=>$('#s3bonusTxt').hidden=false;
+let bonusGiven=false;$('#s3bonusOk').onclick=()=>{if(bonusGiven)return;bonusGiven=true;award(3,'보너스 질문')};
+$('#s3trap').onclick=()=>{const o=$('#s3trapOut');o.hidden=!o.hidden;if(o.hidden)return;
+  const g=D3.map((r,i)=>({i,d2:(169-r.h)**2+((72-r.w)*1000)**2})).sort((a,b)=>a.d2-b.d2).slice(0,5);
+  const kg=s3order.slice(0,5);
+  o.innerHTML=`<div class="fb"><div class="row" style="align-items:flex-start;gap:20px"><div><b>kg일 때 1~5위</b><br><span class="mono">${kg.map(i=>D3[i].n+'번').join(' · ')}</span></div><div><b>g일 때 1~5위</b><br><span class="mono">${g.map(x=>D3[x.i].n+'번').join(' · ')}</span></div></div><p style="margin:8px 0 0">g으로 바꾸면 몸무게 차이가 수천 배로 커져 <b>키는 거의 무시</b>되고, 몸무게만으로 순위가 정해진다. 그래서 단위와 범위를 맞추는 <b>스케일링</b>(184쪽)이 필요하다.</p></div>`};
+renderRank();
+
+/* ---------- STAGE 4 ---------- */
+const s4={mode:'A',pts:[],won:false};const STAR4=[5,5];
+$$('#s4mode button[data-m]').forEach(b=>b.onclick=()=>{s4.mode=b.dataset.m;$$('#s4mode button[data-m]').forEach(x=>x.classList.toggle('on',x===b))});
+$('#s4clear').onclick=()=>{s4.pts=[];renderS4()};
+const svg4=$('#svg4');
+svg4.addEventListener('click',e=>{if(e.target.closest('[data-pi]'))return;if(s4.mode==='del')return;
+  const pt=svg4.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const p=pt.matrixTransform(svg4.getScreenCTM().inverse());
+  const x=Math.round((p.x-30)/44*10)/10,y=Math.round((470-p.y)/44*10)/10;if(x<0||x>10||y<0||y>10)return;
+  if(dist([x,y],STAR4)<0.25){toast1('별과 너무 가까워요');return}
+  s4.pts.push({x,y,c:s4.mode});renderS4()});
+function v4(k){if(s4.pts.length<k)return{m:null,cnt:{}};const o=s4.pts.map(p=>p).sort((a,b)=>dist([a.x,a.y],STAR4)-dist([b.x,b.y],STAR4)).slice(0,k);const cnt={};o.forEach(p=>cnt[p.c]=(cnt[p.c]||0)+1);return{m:majority(cnt),cnt}}
+function renderS4(){svg4.innerHTML='';grid(svg4);
+  const order=s4.pts.map((p,i)=>i).sort((a,b)=>dist([s4.pts[a].x,s4.pts[a].y],STAR4)-dist([s4.pts[b].x,s4.pts[b].y],STAR4));
+  if(s4.pts.length>=3){const r=dist([s4.pts[order[2]].x,s4.pts[order[2]].y],STAR4);el('circle',{cx:px(5),cy:py(5),r:r*44+13,class:'ring'},svg4)}
+  s4.pts.forEach((p,i)=>{const g=shape(svg4,p.c,px(p.x),py(p.y),11);g.dataset.pi=i;g.classList.add('clickable');g.onclick=()=>{if(s4.mode==='del'){s4.pts.splice(i,1);renderS4()}};
+    const rk=order.indexOf(i)+1;if(rk<=5){const t=el('text',{x:px(p.x),y:py(p.y)+(p.c==='B'?6:4),'text-anchor':'middle',class:'rank'},svg4);t.textContent=rk}});
+  shape(svg4,'star',px(5),py(5),11);
+  const a=v4(1),b=v4(3),c=v4(5);
+  const line=(lab,v,k)=>`<div style="margin:4px 0"><b>${lab}</b> · ${v.m?`A ${v.cnt.A||0}, B ${v.cnt.B||0} → <b>${NAME[v.m]}</b>`:`<span class="ref">점이 ${k}개 이상 필요</span>`}</div>`;
+  $('#s4verdict').innerHTML=line('봇 (k=1)',a,1)+line('탐정 (k=3)',b,3)+line('추가 도전 (k=5)',c,5);
+  const win=a.m&&b.m&&a.m!=='tie'&&b.m!=='tie'&&a.m!==b.m;
+  if(win&&!s4.won){s4.won=true;award(5,'봇 깨기 성공')}
+  $('#s4fb').innerHTML=win?`<div class="fb good"><b class="good">봇이 깨졌다!</b> 가장 가까운 점 하나만 믿으면 이렇게 틀릴 수 있다. 어떤 점이 봇을 속였는지 설명해 보자.</div>`:(s4.won?'':`<div class="fb">별 주변에 점을 찍어 보세요. 순위 숫자 1~5가 가까운 순서입니다.</div>`)}
+renderS4();
+
+/* ---------- BOSS ---------- */
+const qDone={};
+function qAward(q,ok,fbId){$(fbId).innerHTML=ok?'<b style="color:var(--ok)">정답</b>':'<b style="color:var(--bad)">다시 생각해 보자</b>';if(ok&&!qDone[q]){qDone[q]=1;award(3,'보스 '+q+' 정답')}}
+const BOSS=[['가',5,6,'합격'],['나',7,5,'불합격'],['다',4,3,'합격'],['라',8,9,'불합격'],['마',2,5,'불합격']].map(r=>({n:r[0],x:r[1],y:r[2],r:r[3],d2:(5-r[1])**2+(5-r[2])**2}));
+const bossRank=BOSS.map((r,i)=>i).sort((a,b)=>BOSS[a].d2-BOSS[b].d2);
+BOSS.forEach((r,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${r.n}</td><td class="mono">${r.x}</td><td class="mono">${r.y}</td><td>${r.r}</td><td><input id="bq_${i}" inputmode="decimal" aria-label="${r.n}와 N 사이 거리"></td><td class="mono" id="br_${i}"></td>`;$('#bossTbl tbody').appendChild(tr)});
+$('#q1check').onclick=()=>{let good=0;BOSS.forEach((r,i)=>{const inp=$('#bq_'+i),v=inp.value.trim(),ok=okVal(v,r);inp.classList.toggle('ok',ok);inp.classList.toggle('no',v!==''&&!ok);if(ok)good++});
+  if(good===5)BOSS.forEach((r,i)=>$('#br_'+i).textContent=(bossRank.indexOf(i)+1)+'위');
+  qAward('Q1',good===5,'#q1fb');if(good<5)$('#q1fb').innerHTML+=` <span class="mono">${good} / 5</span>`};
+$$('[data-q2]').forEach(b=>b.onclick=()=>{LOG.q2=b.dataset.q2;$$('[data-q2]').forEach(x=>x.classList.toggle('on',x===b));qAward('Q2',b.dataset.q2==='합격','#q2fb')});
+$$('[data-q3]').forEach(b=>b.onclick=()=>{LOG.q3=b.dataset.q3;$$('[data-q3]').forEach(x=>x.classList.toggle('on',x===b));qAward('Q3',b.dataset.q3==='불합격','#q3fb')});
+$('#q4ans').onclick=()=>$('#q4txt').hidden=false;
+$('#q4ok').onclick=()=>{if(qDone.Q4)return;qDone.Q4=1;award(3,'보스 Q4 인정')};
+/* ---------- REPORT / PDF ---------- */
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mark=ok=>ok?'<span style="color:#1d8f55;font-weight:700">O</span>':'<span style="color:#c94a2c;font-weight:700">X</span>';
+function buildReport(){
+  const now=new Date(),ds=`${now.getFullYear()}.${now.getMonth()+1}.${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const name=$('#stuName').value.trim()||'(미입력)';
+  const T='style="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 4px"';
+  const th=x=>`<th style="border:1px solid #b9c5d8;background:#e8eef7;padding:4px 6px">${x}</th>`;
+  const td=(x,l)=>`<td style="border:1px solid #b9c5d8;padding:4px 6px;text-align:${l?'left':'center'}">${x}</td>`;
+  const H=t=>`<h2 style="font-size:15px;margin:16px 0 4px;color:#14213a;border-bottom:2px solid #d99800;padding-bottom:3px">${t}</h2>`;
+  const none='<p style="font-size:12px;color:#6b778c;margin:4px 0">기록 없음</p>';
+  let h=`<div style="width:720px;padding:8px 14px;font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif;color:#14213a;background:#fff;line-height:1.5">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #14213a;padding-bottom:6px">
+   <div><div style="font-size:12px;color:#4f5f7a">수리와 인공지능 · 분류 모델(k-최근접 이웃)</div><div style="font-size:22px;font-weight:700">분류 탐정 결과 기록</div></div>
+   <div style="text-align:right;font-size:12px">학생: <b>${esc(name)}</b><br>저장: ${ds}<br>최종 코인: <b>${coins}</b></div></div>`;
+  h+=H('1 · 안개 지도');
+  h+=LOG.s1.length?`<table ${T}><tr>${th('도전')}${th('미션 k')}${th('열어 본 결과')}${th('다수결')}${th('내 판정')}${th('가장 가까운 k개 선택')}${th('결과')}</tr>`+LOG.s1.map((r,i)=>`<tr>${td(i+1)}${td(r.k)}${td(`A ${r.cnt.A||0} / B ${r.cnt.B||0}`)}${td(r.maj)}${td(r.ans)}${td(mark(r.near))}${td(mark(r.ok))}</tr>`).join('')+'</table>':none;
+  h+=H('2 · 함정 지도');
+  h+=LOG.s2.length?`<table ${T}><tr>${th('도전')}${th('k')}${th('예측')}${th('실제 결과')}${th('적중')}</tr>`+LOG.s2.map((r,i)=>`<tr>${td(i+1)}${td(r.k)}${td(r.pred)}${td(r.res)}${td(mark(r.right))}</tr>`).join('')+'</table>':none;
+  h+=H('3 · 사이즈 감별사 (키 169cm, 몸무게 72kg)');
+  h+=`<table ${T}><tr>${th('번호')}${th('키')}${th('몸무게')}${th('사이즈')}${th('입력한 거리')}${th('정답 거리²')}${th('정오')}</tr>`+D3.map((r,i)=>{const v=$('#d3_'+i).value.trim();return `<tr>${td(r.n+(i>=6?' (교사)':''))}${td(r.h)}${td(r.w)}${td(r.s)}${td(esc(v)||'-')}${td(r.d2)}${td(v?mark(okVal(v,r)):'-')}</tr>`}).join('')+'</table>';
+  h+=`<table ${T}><tr>${th('k')}${th('베팅')}${th('실제 결과')}${th('적중')}</tr>`+[3,4,5].map(k=>{const v=verdict3(k),b=s3.bets[k];return `<tr>${td('k='+k)}${td(b||'-')}${td(s3.opened?v.m:'(공개 전)')}${td(s3.opened&&b?mark(b===v.m):'-')}</tr>`}).join('')+'</table>';
+  h+=`<p style="font-size:12px;margin:4px 0">보너스 질문(√와 순위): ${bonusGiven?'교사 인정':'미인정'}</p>`;
+  h+=H('4 · 고집쟁이 봇 깨기');
+  h+=`<p style="font-size:12px;margin:4px 0">찍은 점 ${s4.pts.length}개 · 봇(k=1)과 탐정(k=3) 판정이 다른 지도 ${s4.won?'<b>완성</b>':'미완성'}</p>`;
+  h+='<div style="page-break-before:always;height:0"></div>'+H('보스 퀴즈 (새 데이터 N: 공부 시간 5시간, 과제 점수 5점)');
+  h+=`<table ${T}><tr>${th('학생')}${th('공부 시간')}${th('과제 점수')}${th('결과')}${th('입력한 거리')}${th('정오')}</tr>`+BOSS.map((r,i)=>{const v=$('#bq_'+i).value.trim();return `<tr>${td(r.n)}${td(r.x)}${td(r.y)}${td(r.r)}${td(esc(v)||'-')}${td(v?mark(okVal(v,r)):'-')}</tr>`}).join('')+'</table>';
+  h+=`<p style="font-size:12px;margin:4px 0">Q2 (k=3): ${LOG.q2||'-'} ${LOG.q2?mark(LOG.q2==='합격'):''} &nbsp;&nbsp; Q3 (k=5): ${LOG.q3||'-'} ${LOG.q3?mark(LOG.q3==='불합격'):''}</p>`;
+  const box=t=>`<div class="pdf-keep" style="border:1px solid #b9c5d8;border-radius:6px;padding:8px 10px;font-size:12px;white-space:pre-wrap;min-height:36px">${esc(t)||'<span style="color:#6b778c">(작성하지 않음)</span>'}</div>`;
+  h+=`<p style="font-size:12px;margin:8px 0 4px"><b>Q4.</b> 임계값 규칙과 kNN의 차이 ${qDone.Q4?'· 교사 인정':''}</p>`+box($('#q4').value);
+  h+=H('성찰일지');
+  [['r1','수업을 통해 알게 된 내용'],['r2','잘 몰라서 더 알아봐야 할 내용'],['r3','호기심이 생긴 내용'],['r4','코인을 가장 아깝게 쓴 순간과 놓친 것']].forEach(([id,l])=>{h+=`<p style="font-size:12px;margin:8px 0 4px"><b>${l}</b></p>`+box($('#'+id).value)});
+  return h+'</div>';
+}
+async function savePDF(){
+  const msg=$('#saveMsg');
+  if(!$('#stuName').value.trim()){go('s5');$('#stuName').focus();msg.textContent='학번 또는 별명을 먼저 써 주세요.';return}
+  if(typeof html2pdf==='undefined'){msg.textContent='PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인하세요.';return}
+  const now=new Date(),fn=`분류탐정_${$('#stuName').value.trim().replace(/[\\/:*?"<>|\s]+/g,'_')}_${now.getMonth()+1}월${now.getDate()}일.pdf`;
+  msg.textContent='PDF 만드는 중…';
+  const holder=document.createElement('div');holder.style.cssText='position:absolute;left:-10000px;top:0;width:740px;background:#fff';holder.innerHTML=buildReport();document.body.appendChild(holder);
+  const sx=window.scrollX,sy=window.scrollY;window.scrollTo(0,0);
+  try{await html2pdf().set({margin:[10,8,10,8],filename:fn,image:{type:'jpeg',quality:0.95},html2canvas:{scale:2,backgroundColor:'#ffffff',scrollX:0,scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','.pdf-keep']}}).from(holder.firstElementChild).save();
+    msg.textContent='저장했어요: '+fn;toast1('PDF 저장 완료')}
+  catch(e){msg.textContent='이 화면에서는 파일 저장이 막혀 있어요. GitHub에 올린 페이지에서 다시 눌러 주세요.'}
+  finally{holder.remove();window.scrollTo(sx,sy)}
+}
+$('#saveBtn').onclick=savePDF;$('#saveTop').onclick=savePDF;
+</script>
